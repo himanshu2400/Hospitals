@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: 199 89% 48%;
+  --brand-foreground: 0 0% 100%;
+}
+
+@layer base {
+  html {
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+}
+
+@layer components {
+  .brand-bg {
+    background-color: hsl(var(--brand));
+    color: hsl(var(--brand-foreground));
+  }
+  .brand-text {
+    color: hsl(var(--brand));
+  }
+  .brand-ring {
+    box-shadow: 0 0 0 2px hsl(var(--brand) / 0.4);
+  }
+  .brand-gradient {
+    background-image: linear-gradient(135deg, hsl(var(--brand)) 0%, hsl(var(--brand) / 0.85) 100%);
+  }
+}
+
+/* Smooth transitions for live-updating numbers */
+.token-pulse {
+  animation: tokenPulse 0.6s ease-out;
+}
+
+@keyframes tokenPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(215 25% 80%); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(215 25% 70%); }
