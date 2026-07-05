@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "host.bolt.queueflow_hospital_q_8wzj.twa",
+    "sha256_cert_fingerprints": ["A9:3A:F0:48:02:8E:82:75:B4:60:25:4F:1F:55:04:9A:9E:4E:73:DD:9F:0D:D4:F2:E2:5A:D2:EE:15:4C:B1:84"]
+  }
+}]
