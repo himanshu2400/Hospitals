@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   UserRound, Clock, CheckCircle2, PhoneCall, Users, Plus, UserPlus,
-  Loader2, AlertCircle, Link as LinkIcon, Check,
+  Loader2, AlertCircle, Link as LinkIcon, Check, QrCode, X,
 } from 'lucide-react';
 import type { Clinic, Doctor, QueueSession, Token } from '../lib/types';
 import { averageConsultDurationMinutes, formatWaitTime } from '../lib/waitTime';
@@ -37,6 +38,9 @@ export function DoctorCard({
   const [addName, setAddName] = useState('');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
+
+  const queueUrl = `${window.location.origin}${window.location.pathname}#/queue/${row.clinic.slug}/${row.id}`;
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -67,13 +71,22 @@ export function DoctorCard({
               <p className="text-sm text-slate-500 truncate">{row.specialty}</p>
             </div>
           </div>
-          <button
-            onClick={onCopyLink}
-            title="Copy public queue link"
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition shrink-0"
-          >
-            {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <LinkIcon className="w-4 h-4" />}
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => setShowQr(true)}
+              title="Show QR code"
+              className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition"
+            >
+              <QrCode className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onCopyLink}
+              title="Copy public queue link"
+              className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition"
+            >
+              {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <LinkIcon className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
@@ -203,6 +216,54 @@ export function DoctorCard({
           </p>
         )}
       </div>
+
+      {showQr && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-4 fade-in"
+          onClick={() => setShowQr(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl ring-1 ring-slate-200 p-6 max-w-xs w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <QrCode className="w-5 h-5" />
+                Queue QR code
+              </h3>
+              <button
+                onClick={() => setShowQr(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex justify-center mb-4">
+              <div className="bg-white p-4 rounded-xl ring-1 ring-slate-200">
+                <QRCodeSVG
+                  value={queueUrl}
+                  size={200}
+                  level="M"
+                  includeMargin={false}
+                />
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 text-center mb-1">
+              {row.name}
+            </p>
+            <p className="text-xs text-slate-400 text-center break-all mb-4">
+              {queueUrl}
+            </p>
+            <button
+              onClick={() => { navigator.clipboard?.writeText(queueUrl); onCopyLink(); }}
+              className="w-full brand-bg rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
+              {copied ? 'Copied!' : 'Copy link'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
