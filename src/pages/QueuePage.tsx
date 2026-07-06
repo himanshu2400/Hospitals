@@ -49,7 +49,6 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
         .from('doctors')
         .select('*')
         .eq('id', doctorId)
-        .eq('clinic_id', clinic.id)
         .maybeSingle();
       if (doctorErr || !doctor) {
         if (!cancelled) setState({ kind: 'error', message: 'Doctor not found.' });

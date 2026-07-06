@@ -13,9 +13,7 @@ function Routes() {
     case 'home':
       return <HomePage />;
     case 'login':
-      return <AuthPage mode="login" />;
-    case 'signup':
-      return <AuthPage mode="signup" />;
+      return <AuthPage />;
     case 'queue':
       return <QueuePage clinicSlug={route.clinicSlug} doctorId={route.doctorId} />;
     case 'dashboard':

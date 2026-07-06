@@ -8,9 +8,25 @@ export type Clinic = {
   created_at: string;
 };
 
+export type Department = {
+  id: string;
+  clinic_id: string;
+  name: string;
+  created_at: string;
+};
+
+export type DepartmentStaff = {
+  id: string;
+  department_id: string;
+  user_id: string;
+  role: string;
+  created_at: string;
+};
+
 export type Doctor = {
   id: string;
   clinic_id: string;
+  department_id: string | null;
   name: string;
   specialty: string;
   created_at: string;
@@ -43,6 +59,10 @@ export type DoctorWithSession = Doctor & {
   queue_sessions: QueueSession[];
 };
 
-export type ClinicWithDoctors = Clinic & {
+export type DepartmentWithDoctors = Department & {
   doctors: DoctorWithSession[];
+};
+
+export type ClinicWithDepartments = Clinic & {
+  departments: Department[];
 };

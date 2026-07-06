@@ -3,7 +3,6 @@ import { useEffect, useState, useCallback } from 'react';
 export type Route =
   | { name: 'home' }
   | { name: 'login' }
-  | { name: 'signup' }
   | { name: 'dashboard' }
   | { name: 'settings' }
   | { name: 'queue'; clinicSlug: string; doctorId: string };
@@ -14,7 +13,6 @@ function parseHash(): Route {
 
   if (parts.length === 0) return { name: 'home' };
   if (parts[0] === 'login') return { name: 'login' };
-  if (parts[0] === 'signup') return { name: 'signup' };
   if (parts[0] === 'dashboard') return { name: 'dashboard' };
   if (parts[0] === 'settings') return { name: 'settings' };
   if (parts[0] === 'queue' && parts[1] && parts[2]) {
