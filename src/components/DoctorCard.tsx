@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   UserRound, Clock, CheckCircle2, PhoneCall, Users, Plus, UserPlus,
-  Loader2, AlertCircle, Link as LinkIcon, Check, QrCode, X,
+  Loader2, AlertCircle, Link as LinkIcon, Check, QrCode, X, Lock,
 } from 'lucide-react';
 import type { Clinic, Doctor, QueueSession, Token } from '../lib/types';
 import { averageConsultDurationMinutes, formatWaitTime } from '../lib/waitTime';
@@ -19,13 +19,15 @@ type Props = {
   busy: boolean;
   canManage: boolean;
   onCallNext: () => void;
+  onEndConsultation: () => void;
   onStartSession: () => void;
+  onCloseQueue: () => void;
   onCopyLink: () => void;
   copied: boolean;
 };
 
 export function DoctorCard({
-  row, busy, canManage, onCallNext, onStartSession, onCopyLink, copied,
+  row, busy, canManage, onCallNext, onEndConsultation, onStartSession, onCloseQueue, onCopyLink, copied,
 }: Props) {
   const session = row.session;
   const currentToken = session?.current_token ?? 0;
@@ -33,9 +35,11 @@ export function DoctorCard({
   const waiting = row.tokens.filter((t) => t.status === 'waiting' && t.token_number > currentToken);
   const completed = row.tokens.filter((t) => t.status === 'completed');
   const avg = averageConsultDurationMinutes(row.tokens);
+  const isClosed = session?.status === 'closed';
 
   const [showAdd, setShowAdd] = useState(false);
   const [addName, setAddName] = useState('');
+  const [addAge, setAddAge] = useState('');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [showQr, setShowQr] = useState(false);
@@ -45,11 +49,17 @@ export function DoctorCard({
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!addName.trim() || adding || !session) return;
+    const ageNum = addAge.trim() ? parseInt(addAge, 10) : undefined;
+    if (addAge.trim() && (Number.isNaN(ageNum) || ageNum! < 0 || ageNum! > 150)) {
+      setAddError('Please enter a valid age.');
+      return;
+    }
     setAdding(true);
     setAddError(null);
     try {
-      await checkInPatient(session.id, addName);
+      await checkInPatient(session.id, addName, ageNum);
       setAddName('');
+      setAddAge('');
       setShowAdd(false);
     } catch (err) {
       setAddError(err instanceof Error ? err.message : 'Failed to add patient');
@@ -98,7 +108,7 @@ export function DoctorCard({
         {inConsult && (
           <div className="mt-3 flex items-center gap-2 text-sm bg-sky-50 text-sky-900 rounded-lg px-3 py-2">
             <UserRound className="w-4 h-4" />
-            <span>In consult: <span className="font-medium">{inConsult.patient_name}</span></span>
+            <span>In consult: <span className="font-medium">{inConsult.patient_name}</span>{inConsult.age != null && <span className="text-sky-700"> · {inConsult.age}y</span>}</span>
           </div>
         )}
 
@@ -109,7 +119,14 @@ export function DoctorCard({
           </p>
         )}
 
-        {!session && (
+        {isClosed && (
+          <div className="mt-3 flex items-center gap-2 text-sm text-slate-600 bg-slate-100 rounded-lg px-3 py-2">
+            <Lock className="w-4 h-4" />
+            <span>Queue closed for today</span>
+          </div>
+        )}
+
+        {!session && !isClosed && (
           <div className="mt-3">
             <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2 flex items-center gap-2 mb-2">
               <AlertCircle className="w-4 h-4" />
@@ -130,31 +147,43 @@ export function DoctorCard({
       </div>
 
       <div className="px-5 pb-5">
-        {session && canManage && (
+        {session && canManage && !isClosed && (
           <>
-            <button
-              onClick={onCallNext}
-              disabled={busy || waiting.length === 0}
-              className="w-full brand-bg rounded-xl py-3 font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {busy ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : waiting.length === 0 ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  Queue complete
-                </>
-              ) : (
-                <>
-                  <PhoneCall className="w-4 h-4" />
-                  Call next patient
-                </>
-              )}
-            </button>
+            {/* Two independent action buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={onEndConsultation}
+                disabled={busy || !inConsult}
+                className="rounded-xl py-3 font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed bg-slate-100 text-slate-700 hover:bg-slate-200"
+              >
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                End consult
+              </button>
+              <button
+                onClick={onCallNext}
+                disabled={busy || waiting.length === 0}
+                className="brand-bg rounded-xl py-3 font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {busy ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : waiting.length === 0 ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Queue complete
+                  </>
+                ) : (
+                  <>
+                    <PhoneCall className="w-4 h-4" />
+                    Call next
+                  </>
+                )}
+              </button>
+            </div>
 
+            {/* Add patient form */}
             {showAdd ? (
               <form onSubmit={handleAdd} className="mt-2 fade-in">
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
                     value={addName}
@@ -163,10 +192,21 @@ export function DoctorCard({
                     autoFocus
                     maxLength={100}
                     className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500"
+                    required
+                  />
+                  <input
+                    type="number"
+                    value={addAge}
+                    onChange={(e) => setAddAge(e.target.value)}
+                    placeholder="Age"
+                    min={0}
+                    max={150}
+                    className="w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500"
+                    required
                   />
                   <button
                     type="submit"
-                    disabled={adding || !addName.trim()}
+                    disabled={adding || !addName.trim() || !addAge.trim()}
                     className="brand-bg rounded-lg px-3 py-2 text-sm font-semibold hover:opacity-90 transition disabled:opacity-60 flex items-center gap-1.5"
                   >
                     {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
@@ -174,7 +214,7 @@ export function DoctorCard({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setShowAdd(false); setAddName(''); setAddError(null); }}
+                    onClick={() => { setShowAdd(false); setAddName(''); setAddAge(''); setAddError(null); }}
                     className="text-sm text-slate-500 hover:text-slate-700 px-2 py-2 rounded-lg hover:bg-slate-100 transition"
                   >
                     Cancel
@@ -194,25 +234,35 @@ export function DoctorCard({
                 className="w-full mt-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg py-2 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
                 <UserPlus className="w-4 h-4" />
-                Add walk-in patient
+                Add patient
               </button>
             )}
+
+            {/* Close queue */}
+            <button
+              onClick={onCloseQueue}
+              disabled={busy}
+              className="w-full mt-2 text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg py-2 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              <Lock className="w-4 h-4" />
+              Close queue for today
+            </button>
           </>
         )}
-        {session && !canManage && (
+        {session && !canManage && !isClosed && (
           <div className="w-full rounded-xl py-3 text-sm text-center text-slate-500 bg-slate-100 flex items-center justify-center gap-1.5">
             <Users className="w-4 h-4" />
             View only — ask an admin to manage the queue
           </div>
         )}
-        {!session && canManage && (
+        {!session && canManage && !isClosed && (
           <p className="text-center text-xs text-slate-500">
             Start a session to begin calling patients
           </p>
         )}
-        {waiting.length > 0 && session && (
+        {waiting.length > 0 && session && !isClosed && (
           <p className="text-center text-xs text-slate-500 mt-2">
-            Next: Token #{waiting[0].token_number} · {waiting[0].patient_name}
+            Next: Token #{waiting[0].token_number} · {waiting[0].patient_name}{waiting[0].age != null ? ` · ${waiting[0].age}y` : ''}
           </p>
         )}
       </div>

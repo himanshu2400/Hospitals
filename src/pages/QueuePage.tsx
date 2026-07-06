@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import {
   Clock, Hash, Loader2, Search, UserRound, CheckCircle2,
-  Stethoscope, AlertCircle, Hourglass,
+  Stethoscope, AlertCircle, Hourglass, Lock,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Clinic, Doctor, QueueSession, Token } from '../lib/types';
@@ -195,6 +195,12 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
               <p className="mt-4 text-white/80 text-sm flex items-center gap-1.5">
                 <UserRound className="w-4 h-4" />
                 Currently in consultation: <span className="font-medium text-white">{inConsult.patient_name}</span>
+              </p>
+            )}
+            {session && session.status === 'closed' && (
+              <p className="mt-4 text-white/80 text-sm flex items-center gap-1.5">
+                <Lock className="w-4 h-4" />
+                Queue closed for today. Please check back tomorrow.
               </p>
             )}
             {!session && (

@@ -11,6 +11,7 @@ import type { Token } from './types';
 export async function checkInPatient(
   queueSessionId: string,
   patientName: string,
+  age?: number,
   maxRetries = 5,
 ): Promise<Token> {
   const name = patientName.trim();
@@ -36,6 +37,7 @@ export async function checkInPatient(
         patient_name: name,
         token_number: nextNumber,
         status: 'waiting',
+        age: age ?? null,
       })
       .select()
       .single();

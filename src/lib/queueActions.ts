@@ -1,30 +1,43 @@
 import { supabase } from './supabase';
 import type { DoctorRow } from '../components/DoctorCard';
 
+/**
+ * End the current consultation: marks the in_consult token as completed
+ * and sets consult_ended_at. Does NOT advance current_token or call the
+ * next patient — that is a separate action (callNextPatient).
+ */
+export async function endConsultation(doctor: DoctorRow): Promise<void> {
+  if (!doctor.session) return;
+  const sessionId = doctor.session.id;
+  const currentToken = doctor.session.current_token;
+  if (currentToken <= 0) return;
+
+  const { error: endErr } = await supabase
+    .from('tokens')
+    .update({ status: 'completed', consult_ended_at: new Date().toISOString() })
+    .eq('queue_session_id', sessionId)
+    .eq('token_number', currentToken)
+    .eq('status', 'in_consult');
+  if (endErr) throw endErr;
+}
+
+/**
+ * Call the next waiting patient: sets the next waiting token to
+ * in_consult, sets consult_started_at, and advances current_token.
+ * Does NOT end the current consultation — that is a separate action
+ * (endConsultation). If there is no next patient, advances current_token
+ * and sets status to 'waiting'.
+ */
 export async function callNextPatient(doctor: DoctorRow): Promise<void> {
   if (!doctor.session) return;
-  const now = new Date().toISOString();
   const sessionId = doctor.session.id;
   const currentToken = doctor.session.current_token;
 
-  // 1. End the current consultation (the token == current_token), if any.
-  if (currentToken > 0) {
-    const { error: endErr } = await supabase
-      .from('tokens')
-      .update({ status: 'completed', consult_ended_at: now })
-      .eq('queue_session_id', sessionId)
-      .eq('token_number', currentToken)
-      .eq('status', 'in_consult');
-    if (endErr) throw endErr;
-  }
-
-  // 2. Find the next waiting token (smallest token_number > current_token).
   const next = doctor.tokens
     .filter((t) => t.status === 'waiting' && t.token_number > currentToken)
     .sort((a, b) => a.token_number - b.token_number)[0];
 
   if (!next) {
-    // No more patients — just advance the token and mark session waiting.
     const { error: sessErr } = await supabase
       .from('queue_sessions')
       .update({ current_token: currentToken + 1, status: 'waiting' })
@@ -33,19 +46,28 @@ export async function callNextPatient(doctor: DoctorRow): Promise<void> {
     return;
   }
 
-  // 3. Start the next patient's consultation.
   const { error: startErr } = await supabase
     .from('tokens')
-    .update({ status: 'in_consult', consult_started_at: now })
+    .update({ status: 'in_consult', consult_started_at: new Date().toISOString() })
     .eq('id', next.id);
 
-  // 4. Advance the session's current_token to the next patient's number.
   const { error: sessErr } = await supabase
     .from('queue_sessions')
     .update({ current_token: next.token_number, status: 'active' })
     .eq('id', sessionId);
 
   if (startErr) throw startErr;
+  if (sessErr) throw sessErr;
+}
+
+/**
+ * Close the queue for today: sets status to 'closed' and ended_at to now.
+ */
+export async function closeQueue(sessionId: string): Promise<void> {
+  const { error: sessErr } = await supabase
+    .from('queue_sessions')
+    .update({ status: 'closed', ended_at: new Date().toISOString() })
+    .eq('id', sessionId);
   if (sessErr) throw sessErr;
 }
 

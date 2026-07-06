@@ -3,7 +3,7 @@ import { Loader2, LogOut, Calendar, Users, AlertCircle } from 'lucide-react';
 import type { Clinic, Department } from '../lib/types';
 import { useDepartmentDoctors } from '../lib/useDepartmentDoctors';
 import { useClinicTheme } from '../lib/theme';
-import { callNextPatient, startSession } from '../lib/queueActions';
+import { callNextPatient, endConsultation, startSession, closeQueue } from '../lib/queueActions';
 import { BrandHeader } from './BrandHeader';
 import { DoctorCard } from './DoctorCard';
 
@@ -41,6 +41,30 @@ export function DepartmentConsole({ clinic, departments, onSignOut }: Props) {
       await startSession(doctorId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start session');
+    } finally {
+      setBusyDoctorId(null);
+    }
+  }
+
+  async function handleEndConsultation(doctor: Parameters<typeof DoctorCard>[0]['row']) {
+    if (!doctor.session || busyDoctorId) return;
+    setBusyDoctorId(doctor.id);
+    try {
+      await endConsultation(doctor);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to end consultation');
+    } finally {
+      setBusyDoctorId(null);
+    }
+  }
+
+  async function handleCloseQueue(sessionId: string, doctorId: string) {
+    if (busyDoctorId) return;
+    setBusyDoctorId(doctorId);
+    try {
+      await closeQueue(sessionId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to close queue');
     } finally {
       setBusyDoctorId(null);
     }
@@ -121,7 +145,9 @@ export function DepartmentConsole({ clinic, departments, onSignOut }: Props) {
                         busy={busyDoctorId === row.id}
                         canManage={true}
                         onCallNext={() => handleCallNext(row)}
+                        onEndConsultation={() => handleEndConsultation(row)}
                         onStartSession={() => handleStartSession(row.id)}
+                        onCloseQueue={() => handleCloseQueue(row.session!.id, row.id)}
                         onCopyLink={() => copyQueueLink(row)}
                         copied={copiedId === row.id}
                       />

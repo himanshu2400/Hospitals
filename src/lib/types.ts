@@ -42,6 +42,7 @@ export type QueueSession = {
   current_token: number;
   status: QueueSessionStatus;
   created_at: string;
+  ended_at: string | null;
 };
 
 export type Token = {
@@ -53,6 +54,7 @@ export type Token = {
   checked_in_at: string;
   consult_started_at: string | null;
   consult_ended_at: string | null;
+  age: number | null;
 };
 
 export type DoctorWithSession = Doctor & {
