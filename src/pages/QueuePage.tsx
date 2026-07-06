@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import {
   Clock, Hash, Loader2, Search, UserRound, CheckCircle2,
-  Stethoscope, AlertCircle, Hourglass, UserPlus, Ticket,
+  Stethoscope, AlertCircle, Hourglass,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Clinic, Doctor, QueueSession, Token } from '../lib/types';
 import { useClinicTheme } from '../lib/theme';
 import { averageConsultDurationMinutes, estimateWaitMinutes, formatWaitTime } from '../lib/waitTime';
-import { checkInPatient } from '../lib/checkIn';
 import { BrandHeader } from '../components/BrandHeader';
 
 type Props = { clinicSlug: string; doctorId: string };
@@ -24,12 +23,6 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
   const [submittedToken, setSubmittedToken] = useState<number | null>(null);
   const prevCurrentToken = useRef<number | null>(null);
   const [pulseKey, setPulseKey] = useState(0);
-
-  // Check-in form state
-  const [checkInName, setCheckInName] = useState('');
-  const [checkingIn, setCheckingIn] = useState(false);
-  const [checkInError, setCheckInError] = useState<string | null>(null);
-  const [justCheckedIn, setJustCheckedIn] = useState<number | null>(null);
 
   // Load clinic + doctor + today's session
   useEffect(() => {
@@ -145,26 +138,6 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
     setSubmittedToken(n);
   }
 
-  async function handleCheckIn(e: React.FormEvent) {
-    e.preventDefault();
-    if (!state || state.kind !== 'ok' || !state.session) return;
-    if (!checkInName.trim() || checkingIn) return;
-    setCheckingIn(true);
-    setCheckInError(null);
-    try {
-      const newToken = await checkInPatient(state.session.id, checkInName);
-      setJustCheckedIn(newToken.token_number);
-      setSubmittedToken(newToken.token_number);
-      setMyTokenInput(String(newToken.token_number));
-      setCheckInName('');
-      // The realtime subscription will pick up the new token and refresh the list.
-    } catch (err) {
-      setCheckInError(err instanceof Error ? err.message : 'Failed to check in. Please try again.');
-    } finally {
-      setCheckingIn(false);
-    }
-  }
-
   if (state.kind === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -231,71 +204,6 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
             )}
           </div>
         </section>
-
-        {/* Patient check-in */}
-        {session && (
-          <section className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-6 sm:p-8">
-            <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <UserPlus className="w-5 h-5 brand-text" />
-              Check in
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              Enter your name to join the queue. You'll receive your token number immediately.
-            </p>
-
-            {justCheckedIn != null ? (
-              <div className="mt-5 fade-in">
-                <div className="flex items-center gap-4 bg-emerald-50 border border-emerald-200 rounded-xl p-5">
-                  <div className="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-                    <Ticket className="w-7 h-7 text-emerald-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-emerald-700 font-medium">You're checked in!</p>
-                    <p className="text-3xl font-bold text-emerald-900 tabular-nums">
-                      Token #{justCheckedIn}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setJustCheckedIn(null)}
-                    className="text-sm text-emerald-700 hover:text-emerald-900 font-medium px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition"
-                  >
-                    Check in another
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleCheckIn} className="mt-4 flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                  <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={checkInName}
-                    onChange={(e) => setCheckInName(e.target.value)}
-                    placeholder="Your full name"
-                    className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 transition"
-                    required
-                    maxLength={100}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={checkingIn || !checkInName.trim()}
-                  className="brand-bg rounded-lg px-5 py-2.5 font-semibold text-sm hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {checkingIn ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                  Check in
-                </button>
-              </form>
-            )}
-
-            {checkInError && (
-              <div className="mt-3 flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 fade-in">
-                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>{checkInError}</span>
-              </div>
-            )}
-          </section>
-        )}
 
         {/* Wait time estimator */}
         <section className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-6 sm:p-8">
