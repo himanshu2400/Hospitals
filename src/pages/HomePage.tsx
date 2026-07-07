@@ -34,7 +34,7 @@ export function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 page-enter">
       {/* Hero */}
       <header className="brand-gradient text-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between">

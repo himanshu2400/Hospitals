@@ -29,6 +29,7 @@ export type Doctor = {
   department_id: string | null;
   name: string;
   specialty: string;
+  photo_url: string | null;
   created_at: string;
 };
 
@@ -67,4 +68,13 @@ export type DepartmentWithDoctors = Department & {
 
 export type ClinicWithDepartments = Clinic & {
   departments: Department[];
+};
+
+export type PushSubscription = {
+  id: string;
+  token_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  created_at: string;
 };

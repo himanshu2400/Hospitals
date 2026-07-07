@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import {
-  ArrowLeft, Loader2, LogOut, Save, Check, AlertCircle, Activity,
+  ArrowLeft, Loader2, LogOut, Save, Check, AlertCircle, Activity, Upload,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { useRouter } from '../lib/router';
 import { useClinicTheme } from '../lib/theme';
 import { BrandHeader } from '../components/BrandHeader';
+import { uploadImage } from '../lib/storage';
 
 const PRESET_COLORS = [
   '#0ea5e9', '#2563eb', '#0d9488', '#059669', '#65a30d',
@@ -23,6 +24,7 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !authSession) navigate('/login');
@@ -160,23 +162,67 @@ export function SettingsPage() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Logo URL
+              Logo
             </label>
-            <input
-              type="url"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 transition"
-            />
-            {logoUrl && (
-              <img
-                src={logoUrl}
-                alt="Logo preview"
-                className="mt-2 w-14 h-14 rounded-xl object-cover ring-1 ring-slate-200"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-            )}
+            <div className="flex items-center gap-4">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt="Logo preview"
+                  className="w-16 h-16 rounded-xl object-cover ring-1 ring-slate-200"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-xl brand-bg flex items-center justify-center">
+                  <Activity className="w-6 h-6" />
+                </div>
+              )}
+              <div className="flex-1 space-y-2">
+                <label className="btn-press inline-flex items-center gap-1.5 brand-bg rounded-lg px-3 py-2 text-sm font-semibold hover:opacity-90 transition cursor-pointer">
+                  {uploadingLogo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {uploadingLogo ? 'Uploading…' : 'Upload logo'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    className="hidden"
+                    disabled={uploadingLogo}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !authClinic) return;
+                      setUploadingLogo(true);
+                      setError(null);
+                      try {
+                        const url = await uploadImage('logos', file, authClinic.id);
+                        setLogoUrl(url);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : 'Failed to upload logo');
+                      } finally {
+                        setUploadingLogo(false);
+                      }
+                    }}
+                  />
+                </label>
+                <input
+                  type="url"
+                  value={logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                  placeholder="…or paste a URL"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 transition"
+                />
+                {logoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setLogoUrl('')}
+                    className="text-xs text-slate-500 hover:text-red-600 transition"
+                  >
+                    Remove logo
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 mt-1.5">
+              Shown on the public queue page and across all departments.
+            </p>
           </div>
 
           <div>

@@ -52,6 +52,63 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(1rem); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Page-load transition */
+.page-enter {
+  animation: pageEnter 0.4s ease-out;
+}
+
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Token number slide transition */
+.token-slide {
+  animation: tokenSlide 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes tokenSlide {
+  0% { opacity: 0; transform: translateY(-0.5rem) scale(0.92); }
+  60% { opacity: 1; transform: translateY(0) scale(1.06); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Success burst when a consultation completes */
+.success-burst {
+  animation: successBurst 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes successBurst {
+  0% { opacity: 0; transform: scale(0.5); }
+  50% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 37%, #f1f5f9 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* Button press state */
+.btn-press {
+  transition: transform 0.1s ease, opacity 0.15s ease, background-color 0.15s ease;
+}
+.btn-press:active {
+  transform: scale(0.97);
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }

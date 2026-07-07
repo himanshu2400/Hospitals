@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import {
-  Clock, Hash, Loader2, Search, UserRound, CheckCircle2,
-  Stethoscope, AlertCircle, Hourglass, Lock,
+  Clock, Hash, Search, UserRound, CheckCircle2,
+  Stethoscope, AlertCircle, Hourglass, Lock, Bell, BellOff,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Clinic, Doctor, QueueSession, Token } from '../lib/types';
 import { useClinicTheme } from '../lib/theme';
 import { averageConsultDurationMinutes, estimateWaitMinutes, formatWaitTime } from '../lib/waitTime';
 import { BrandHeader } from '../components/BrandHeader';
+import { pushSupported, pushConfigured, subscribeToPush } from '../lib/push';
+import { notifyInPage } from '../lib/notify';
 
 type Props = { clinicSlug: string; doctorId: string };
 
@@ -16,6 +18,8 @@ type LoadState =
   | { kind: 'error'; message: string }
   | { kind: 'ok'; clinic: Clinic; doctor: Doctor; session: QueueSession | null };
 
+type PushState = 'idle' | 'prompting' | 'subscribed' | 'denied' | 'unsupported';
+
 export function QueuePage({ clinicSlug, doctorId }: Props) {
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -23,6 +27,9 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
   const [submittedToken, setSubmittedToken] = useState<number | null>(null);
   const prevCurrentToken = useRef<number | null>(null);
   const [pulseKey, setPulseKey] = useState(0);
+  const [pushState, setPushState] = useState<PushState>('idle');
+  const [showSuccess, setShowSuccess] = useState(false);
+  const notifiedRef = useRef<Set<string>>(new Set());
 
   // Load clinic + doctor + today's session
   useEffect(() => {
@@ -66,7 +73,7 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
   const clinic = state.kind === 'ok' ? state.clinic : null;
   useClinicTheme(clinic);
 
-  // Load tokens for the session
+  // Load tokens for the session + realtime
   useEffect(() => {
     if (state.kind !== 'ok' || !state.session) {
       setTokens([]);
@@ -84,7 +91,6 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
       if (!cancelled) setTokens(data ?? []);
     })();
 
-    // Realtime: listen for changes to queue_sessions (current_token) and tokens.
     const channel = supabase
       .channel(`queue-${sessionId}`)
       .on(
@@ -121,7 +127,31 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
     };
   }, [state.kind, state.kind === 'ok' ? state.session?.id : null]);
 
+  // In-page notification fallback: when current_token changes and the
+  // patient has searched their token, show a toast + chime if they're
+  // within 2 or it's their turn. This works even without push permission.
   const currentToken = state.kind === 'ok' && state.session ? state.session.current_token : 0;
+  useEffect(() => {
+    if (submittedToken == null) return;
+    const diff = submittedToken - currentToken;
+    const key = `${submittedToken}-${currentToken}`;
+    if (notifiedRef.current.has(key)) return;
+
+    if (diff === 0) {
+      notifiedRef.current.add(key);
+      notifyInPage("It's your turn!", `Token #${submittedToken} — please proceed to the consultation room.`, 'turn');
+    } else if (diff > 0 && diff <= 2) {
+      notifiedRef.current.add(key);
+      notifyInPage('Your turn is coming soon', `Token #${submittedToken} — about ${diff} ${diff === 1 ? 'patient' : 'patients'} ahead of you.`, 'info');
+    }
+  }, [submittedToken, currentToken]);
+
+  // Detect if the patient already denied notification permission.
+  useEffect(() => {
+    if (!pushSupported) { setPushState('unsupported'); return; }
+    if (Notification.permission === 'denied') setPushState('denied');
+  }, []);
+
   const avgDuration = useMemo(() => averageConsultDurationMinutes(tokens), [tokens]);
 
   const myToken = submittedToken;
@@ -131,24 +161,46 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
     [myToken, tokens],
   );
 
+  // Show success burst when my token transitions to completed.
+  const wasCompleted = useRef(false);
+  useEffect(() => {
+    if (myTokenRow?.status === 'completed' && !wasCompleted.current) {
+      wasCompleted.current = true;
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 2000);
+    }
+  }, [myTokenRow?.status]);
+
   function handleCheckToken(e: React.FormEvent) {
     e.preventDefault();
     const n = parseInt(myTokenInput, 10);
     if (Number.isNaN(n) || n < 1) return;
     setSubmittedToken(n);
+    notifiedRef.current.clear();
+    wasCompleted.current = false;
+    // Prompt for push after the patient searches their token.
+    if (pushState === 'idle' && pushConfigured) {
+      setPushState('prompting');
+    }
+  }
+
+  async function handleEnablePush() {
+    if (!myTokenRow) return;
+    const ok = await subscribeToPush(myTokenRow.id);
+    setPushState(ok ? 'subscribed' : 'denied');
+  }
+
+  function handleSkipPush() {
+    setPushState(Notification.permission === 'denied' ? 'denied' : 'idle');
   }
 
   if (state.kind === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-      </div>
-    );
+    return <QueuePageSkeleton />;
   }
 
   if (state.kind === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 page-enter">
         <div className="text-center max-w-sm">
           <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
           <h1 className="text-lg font-semibold text-slate-900">{state.message}</h1>
@@ -165,14 +217,14 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
   const inConsult = tokens.find((t) => t.status === 'in_consult');
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 page-enter">
       <BrandHeader
         clinic={clinic}
         subtitle={`${doctor.name} · ${doctor.specialty}`}
       />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6">
-        {/* Now Serving — the live-updating hero card */}
+        {/* Now Serving */}
         <section className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
           <div className="brand-gradient px-6 py-8 sm:px-8 sm:py-10 text-white">
             <div className="flex items-center gap-2 text-white/80 text-sm font-medium uppercase tracking-wide">
@@ -182,13 +234,22 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
             <div className="mt-3 flex items-end gap-4">
               <div
                 key={pulseKey}
-                className="token-pulse text-7xl sm:text-8xl font-bold tabular-nums leading-none"
+                className="token-slide text-7xl sm:text-8xl font-bold tabular-nums leading-none"
               >
                 {currentToken || '—'}
               </div>
-              <div className="pb-2">
-                <p className="text-white/90 font-medium">{doctor.name}</p>
-                <p className="text-white/70 text-sm">{doctor.specialty}</p>
+              <div className="pb-2 flex items-center gap-3">
+                {doctor.photo_url && (
+                  <img
+                    src={doctor.photo_url}
+                    alt={doctor.name}
+                    className="w-12 h-12 rounded-full object-cover ring-2 ring-white/30"
+                  />
+                )}
+                <div>
+                  <p className="text-white/90 font-medium">{doctor.name}</p>
+                  <p className="text-white/70 text-sm">{doctor.specialty}</p>
+                </div>
               </div>
             </div>
             {inConsult && (
@@ -236,7 +297,7 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
             </div>
             <button
               type="submit"
-              className="brand-bg rounded-lg px-5 py-2.5 font-semibold text-sm hover:opacity-90 transition flex items-center justify-center gap-2"
+              className="btn-press brand-bg rounded-lg px-5 py-2.5 font-semibold text-sm hover:opacity-90 transition flex items-center justify-center gap-2"
             >
               <Search className="w-4 h-4" />
               Check wait
@@ -246,7 +307,7 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
           {myToken != null && (
             <div className="mt-5 fade-in">
               {myTokenRow && (myTokenRow.status === 'completed' || myTokenRow.status === 'skipped') ? (
-                <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                <div className={`flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 ${showSuccess ? 'success-burst' : ''}`}>
                   <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                   <div>
                     <p className="font-semibold text-emerald-900">Your consultation is complete</p>
@@ -291,6 +352,57 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* Push notification prompt */}
+              {pushState === 'prompting' && myTokenRow && myTokenRow.status !== 'completed' && (
+                <div className="mt-3 bg-sky-50 border border-sky-200 rounded-xl p-4 fade-in">
+                  <div className="flex items-start gap-3">
+                    <Bell className="w-5 h-5 brand-text mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-slate-900 text-sm">Get notified when it's your turn</p>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        We'll alert you when you're 2 tokens away and again when it's your turn — even if you leave this page.
+                      </p>
+                      <div className="flex items-center gap-2 mt-3">
+                        <button
+                          onClick={handleEnablePush}
+                          className="btn-press brand-bg rounded-lg px-3 py-1.5 text-sm font-semibold hover:opacity-90 transition flex items-center gap-1.5"
+                        >
+                          <Bell className="w-3.5 h-3.5" />
+                          Enable notifications
+                        </button>
+                        <button
+                          onClick={handleSkipPush}
+                          className="btn-press text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
+                        >
+                          Not now
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {pushState === 'subscribed' && (
+                <p className="mt-3 text-xs text-emerald-600 flex items-center gap-1.5 fade-in">
+                  <Bell className="w-3.5 h-3.5" />
+                  Notifications on — we'll alert you when it's your turn.
+                </p>
+              )}
+
+              {pushState === 'denied' && (
+                <p className="mt-3 text-xs text-slate-500 flex items-center gap-1.5 fade-in">
+                  <BellOff className="w-3.5 h-3.5" />
+                  Notifications are blocked. Keep this tab open and you'll still see an in-page alert and hear a chime when it's your turn.
+                </p>
+              )}
+
+              {pushState === 'unsupported' && pushConfigured === false && pushSupported && (
+                <p className="mt-3 text-xs text-slate-400 flex items-center gap-1.5">
+                  <BellOff className="w-3.5 h-3.5" />
+                  Push notifications aren't configured on this server. Keep this tab open for in-page alerts.
+                </p>
               )}
             </div>
           )}
@@ -346,6 +458,37 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
         <footer className="text-center text-xs text-slate-400 pt-2 pb-6">
           Updates live · Powered by QueueFlow
         </footer>
+      </main>
+    </div>
+  );
+}
+
+function QueuePageSkeleton() {
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <div className="bg-white/80 backdrop-blur-md border-b border-slate-200 h-16 flex items-center px-4 sm:px-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl skeleton" />
+          <div className="space-y-1.5">
+            <div className="w-32 h-4 rounded skeleton" />
+            <div className="w-24 h-3 rounded skeleton" />
+          </div>
+        </div>
+      </div>
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6">
+        <div className="rounded-2xl overflow-hidden ring-1 ring-slate-200">
+          <div className="h-40 skeleton" />
+        </div>
+        <div className="bg-white rounded-2xl ring-1 ring-slate-200 p-6 sm:p-8 space-y-4">
+          <div className="w-48 h-6 rounded skeleton" />
+          <div className="w-full h-11 rounded-lg skeleton" />
+          <div className="w-full h-24 rounded-xl skeleton" />
+        </div>
+        <div className="bg-white rounded-2xl ring-1 ring-slate-200 p-6 sm:p-8 space-y-3">
+          <div className="w-32 h-6 rounded skeleton" />
+          <div className="w-full h-14 rounded-xl skeleton" />
+          <div className="w-full h-14 rounded-xl skeleton" />
+        </div>
       </main>
     </div>
   );

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { DoctorRow } from '../components/DoctorCard';
+import { triggerPush } from './push';
 
 /**
  * End the current consultation: marks the in_consult token as completed
@@ -27,6 +28,10 @@ export async function endConsultation(doctor: DoctorRow): Promise<void> {
  * Does NOT end the current consultation — that is a separate action
  * (endConsultation). If there is no next patient, advances current_token
  * and sets status to 'waiting'.
+ *
+ * Also triggers web push notifications:
+ * - To the patient whose token is now within 2 of being called (reminder).
+ * - To the patient whose turn it is now (it's your turn).
  */
 export async function callNextPatient(doctor: DoctorRow): Promise<void> {
   if (!doctor.session) return;
@@ -58,6 +63,30 @@ export async function callNextPatient(doctor: DoctorRow): Promise<void> {
 
   if (startErr) throw startErr;
   if (sessErr) throw sessErr;
+
+  // Trigger push notifications (best-effort, silent failure).
+  // 1. "It's your turn" to the patient now being called.
+  void triggerPush(next.id, {
+    title: "It's your turn!",
+    body: `Token #${next.token_number} — please proceed to ${doctor.name}.`,
+    tag: `turn-${next.id}`,
+  });
+
+  // 2. "You're near" to the patient 2 tokens ahead (within 2 of their number).
+  const upcoming = doctor.tokens
+    .filter((t) => t.status === 'waiting' && t.token_number > next.token_number)
+    .sort((a, b) => a.token_number - b.token_number);
+
+  // The patient whose number is next.token_number + 2 is now "within 2"
+  // of being called (since current_token just became next.token_number).
+  const nearToken = upcoming.find((t) => t.token_number === next.token_number + 2);
+  if (nearToken) {
+    void triggerPush(nearToken.id, {
+      title: 'Your turn is coming soon',
+      body: `Token #${nearToken.token_number} — about 2 patients ahead of you. Please get ready.`,
+      tag: `near-${nearToken.id}`,
+    });
+  }
 }
 
 /**

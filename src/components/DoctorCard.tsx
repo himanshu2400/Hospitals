@@ -43,6 +43,7 @@ export function DoctorCard({
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [showQr, setShowQr] = useState(false);
+  const [justEnded, setJustEnded] = useState(false);
 
   const queueUrl = `${window.location.origin}${window.location.pathname}#/queue/${row.clinic.slug}/${row.id}`;
 
@@ -73,9 +74,17 @@ export function DoctorCard({
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-xl brand-bg flex items-center justify-center shrink-0">
-              <UserRound className="w-5 h-5" />
-            </div>
+            {row.photo_url ? (
+              <img
+                src={row.photo_url}
+                alt={row.name}
+                className="w-11 h-11 rounded-xl object-cover shrink-0 ring-1 ring-slate-200"
+              />
+            ) : (
+              <div className="w-11 h-11 rounded-xl brand-bg flex items-center justify-center shrink-0">
+                <UserRound className="w-5 h-5" />
+              </div>
+            )}
             <div className="min-w-0">
               <h3 className="font-semibold text-slate-900 truncate">{row.name}</h3>
               <p className="text-sm text-slate-500 truncate">{row.specialty}</p>
@@ -136,7 +145,7 @@ export function DoctorCard({
               <button
                 onClick={onStartSession}
                 disabled={busy}
-                className="w-full text-sm font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg py-2 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className="btn-press w-full text-sm font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg py-2 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 Start today's session
@@ -152,17 +161,21 @@ export function DoctorCard({
             {/* Two independent action buttons */}
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={onEndConsultation}
+                onClick={() => {
+                  setJustEnded(true);
+                  setTimeout(() => setJustEnded(false), 1200);
+                  onEndConsultation();
+                }}
                 disabled={busy || !inConsult}
-                className="rounded-xl py-3 font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed bg-slate-100 text-slate-700 hover:bg-slate-200"
+                className={`btn-press rounded-xl py-3 font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed bg-slate-100 text-slate-700 hover:bg-slate-200 ${justEnded ? 'success-burst bg-emerald-100 text-emerald-700' : ''}`}
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                End consult
+                {justEnded ? 'Done!' : 'End consult'}
               </button>
               <button
                 onClick={onCallNext}
                 disabled={busy || waiting.length === 0}
-                className="brand-bg rounded-xl py-3 font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-press brand-bg rounded-xl py-3 font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {busy ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

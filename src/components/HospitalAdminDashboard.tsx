@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Loader2, LogOut, Settings, Calendar, Users, AlertCircle, Plus,
-  Building2, UserPlus, Trash2, Mail, Check, X, BarChart3, LayoutGrid,
+  Building2, UserPlus, Trash2, Mail, Check, X, BarChart3, LayoutGrid, Camera,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useRouter } from '../lib/router';
@@ -9,6 +9,7 @@ import type { Clinic, Department, DepartmentStaff } from '../lib/types';
 import { useDepartmentDoctors } from '../lib/useDepartmentDoctors';
 import { useClinicTheme } from '../lib/theme';
 import { callNextPatient, endConsultation, startSession, closeQueue } from '../lib/queueActions';
+import { uploadImage } from '../lib/storage';
 import { BrandHeader } from './BrandHeader';
 import { DoctorCard } from './DoctorCard';
 import { TodayReport } from './TodayReport';
@@ -46,6 +47,7 @@ export function HospitalAdminDashboard({ clinic, departments: initialDepartments
   const [newDocName, setNewDocName] = useState('');
   const [newDocSpecialty, setNewDocSpecialty] = useState('');
   const [addingDoc, setAddingDoc] = useState(false);
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
 
   const departmentIds = departments.map((d) => d.id);
   const { rows, loading } = useDepartmentDoctors(departmentIds, clinic, true);
@@ -200,6 +202,23 @@ export function HospitalAdminDashboard({ clinic, departments: initialDepartments
     if (delErr) { setError(delErr.message); return; }
   }
 
+  async function handleUploadPhoto(doctorId: string, file: File) {
+    setUploadingPhotoId(doctorId);
+    setError(null);
+    try {
+      const url = await uploadImage('photos', file, doctorId);
+      const { error: updateErr } = await supabase
+        .from('doctors')
+        .update({ photo_url: url })
+        .eq('id', doctorId);
+      if (updateErr) throw updateErr;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload photo');
+    } finally {
+      setUploadingPhotoId(null);
+    }
+  }
+
   async function handleCallNext(row: Parameters<typeof DoctorCard>[0]['row']) {
     if (!row.session || busyDoctorId) return;
     setBusyDoctorId(row.id);
@@ -256,7 +275,7 @@ export function HospitalAdminDashboard({ clinic, departments: initialDepartments
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 page-enter">
       <BrandHeader
         clinic={clinic}
         subtitle="Hospital Admin"
@@ -352,8 +371,40 @@ export function HospitalAdminDashboard({ clinic, departments: initialDepartments
         </form>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+          <div className="space-y-8">
+            {[0, 1].map((i) => (
+              <div key={i} className="space-y-4">
+                <div className="w-40 h-6 rounded skeleton" />
+                <div className="bg-white rounded-2xl ring-1 ring-slate-200 p-5 space-y-3">
+                  <div className="w-32 h-5 rounded skeleton" />
+                  <div className="h-8 rounded-lg skeleton" />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {[0, 1].map((j) => (
+                    <div key={j} className="bg-white rounded-2xl ring-1 ring-slate-200 shadow-sm overflow-hidden">
+                      <div className="p-5 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-xl skeleton" />
+                          <div className="space-y-2 flex-1">
+                            <div className="w-32 h-4 rounded skeleton" />
+                            <div className="w-24 h-3 rounded skeleton" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="h-14 rounded-lg skeleton" />
+                          <div className="h-14 rounded-lg skeleton" />
+                          <div className="h-14 rounded-lg skeleton" />
+                        </div>
+                      </div>
+                      <div className="px-5 pb-5 space-y-2">
+                        <div className="h-10 rounded-xl skeleton" />
+                        <div className="h-8 rounded-lg skeleton" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : departments.length === 0 ? (
           <div className="bg-white rounded-2xl ring-1 ring-slate-200 p-10 text-center">
@@ -555,6 +606,27 @@ export function HospitalAdminDashboard({ clinic, departments: initialDepartments
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
+                            <label
+                              className="absolute top-3 right-20 text-slate-300 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                              aria-label={`Upload photo for ${row.name}`}
+                            >
+                              {uploadingPhotoId === row.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Camera className="w-3.5 h-3.5" />
+                              )}
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                className="hidden"
+                                disabled={uploadingPhotoId !== null}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleUploadPhoto(row.id, file);
+                                  e.currentTarget.value = '';
+                                }}
+                              />
+                            </label>
                           </div>
                         ))}
                       </div>

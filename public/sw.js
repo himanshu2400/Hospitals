@@ -1,5 +1,5 @@
-// QueueFlow service worker — app-shell caching for offline load.
-const CACHE = 'queueflow-v1';
+// QueueFlow service worker — app-shell caching + web push.
+const CACHE = 'queueflow-v2';
 const APP_SHELL = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -21,10 +21,8 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
-  // Only handle same-origin requests; let cross-origin (Supabase API) go to network.
   if (url.origin !== self.location.origin) return;
 
-  // Navigation requests: network-first, fall back to cached index.html (offline).
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).catch(() => caches.match('/index.html').then((r) => r || caches.match('/'))),
@@ -32,7 +30,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets: cache-first, then network (and cache the response).
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
@@ -43,6 +40,40 @@ self.addEventListener('fetch', (event) => {
         }
         return res;
       }).catch(() => cached);
+    }),
+  );
+});
+
+// Web push: display the notification payload sent by the edge function.
+self.addEventListener('push', (event) => {
+  let payload = { title: 'QueueFlow', body: 'Update on your queue', tag: 'queue' };
+  try {
+    if (event.data) payload = event.data.json();
+  } catch {
+    // Not JSON; keep default.
+  }
+  const { title, body, tag } = payload;
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      tag: tag ?? 'queue',
+      renotify: true,
+      data: payload,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      if (clients.length > 0) {
+        clients[0].focus();
+      } else {
+        self.clients.openWindow('/');
+      }
     }),
   );
 });
