@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Loader2, LogOut, Calendar, Users, AlertCircle } from 'lucide-react';
+import { Loader2, LogOut, Calendar, Users, AlertCircle, BarChart3, LayoutGrid } from 'lucide-react';
 import type { Clinic, Department } from '../lib/types';
 import { useDepartmentDoctors } from '../lib/useDepartmentDoctors';
 import { useClinicTheme } from '../lib/theme';
 import { callNextPatient, endConsultation, startSession, closeQueue } from '../lib/queueActions';
 import { BrandHeader } from './BrandHeader';
 import { DoctorCard } from './DoctorCard';
+import { TodayReport } from './TodayReport';
 
 type Props = {
   clinic: Clinic;
@@ -17,6 +18,7 @@ export function DepartmentConsole({ clinic, departments, onSignOut }: Props) {
   const [busyDoctorId, setBusyDoctorId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'console' | 'report'>('console');
 
   const departmentIds = departments.map((d) => d.id);
   const { rows, loading } = useDepartmentDoctors(departmentIds, clinic, true);
@@ -104,9 +106,31 @@ export function DepartmentConsole({ clinic, departments, onSignOut }: Props) {
               {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Users className="w-4 h-4" />
-            {rows.length} {rows.length === 1 ? 'doctor' : 'doctors'}
+          <div className="flex items-center gap-3">
+            <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
+              <button
+                onClick={() => setView('console')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                  view === 'console' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+                Console
+              </button>
+              <button
+                onClick={() => setView('report')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                  view === 'report' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                Today's report
+              </button>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <Users className="w-4 h-4" />
+              {rows.length} {rows.length === 1 ? 'doctor' : 'doctors'}
+            </div>
           </div>
         </div>
 
@@ -129,6 +153,8 @@ export function DepartmentConsole({ clinic, departments, onSignOut }: Props) {
               An admin needs to add doctors to your department before you can manage the queue.
             </p>
           </div>
+        ) : view === 'report' ? (
+          <TodayReport rows={rows} title="Today's report — your department" />
         ) : (
           <div className="space-y-8">
             {departments.map((dept) => {

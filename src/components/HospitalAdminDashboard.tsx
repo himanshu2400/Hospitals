@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Loader2, LogOut, Settings, Calendar, Users, AlertCircle, Plus,
-  Building2, UserPlus, Trash2, Mail, Check, X,
+  Building2, UserPlus, Trash2, Mail, Check, X, BarChart3, LayoutGrid,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useRouter } from '../lib/router';
@@ -11,6 +11,7 @@ import { useClinicTheme } from '../lib/theme';
 import { callNextPatient, endConsultation, startSession, closeQueue } from '../lib/queueActions';
 import { BrandHeader } from './BrandHeader';
 import { DoctorCard } from './DoctorCard';
+import { TodayReport } from './TodayReport';
 
 type Props = {
   clinic: Clinic;
@@ -24,6 +25,7 @@ export function HospitalAdminDashboard({ clinic, departments: initialDepartments
   const [busyDoctorId, setBusyDoctorId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'console' | 'report'>('console');
 
   // Department creation
   const [newDeptName, setNewDeptName] = useState('');
@@ -287,9 +289,31 @@ export function HospitalAdminDashboard({ clinic, departments: initialDepartments
               {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Building2 className="w-4 h-4" />
-            {departments.length} {departments.length === 1 ? 'department' : 'departments'}
+          <div className="flex items-center gap-3">
+            <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
+              <button
+                onClick={() => setView('console')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                  view === 'console' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+                Console
+              </button>
+              <button
+                onClick={() => setView('report')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                  view === 'report' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                Today's report
+              </button>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <Building2 className="w-4 h-4" />
+              {departments.length} {departments.length === 1 ? 'department' : 'departments'}
+            </div>
           </div>
         </div>
 
@@ -338,6 +362,21 @@ export function HospitalAdminDashboard({ clinic, departments: initialDepartments
             <p className="text-sm text-slate-500 mt-1">
               Create your first department above to start adding doctors and managing queues.
             </p>
+          </div>
+        ) : view === 'report' ? (
+          <div className="space-y-6">
+            <TodayReport rows={rows} title="Today's report — all departments" />
+            {departments.map((dept) => {
+              const deptRows = rows.filter((r) => r.department_id === dept.id);
+              if (deptRows.length === 0) return null;
+              return (
+                <TodayReport
+                  key={dept.id}
+                  rows={deptRows}
+                  title={`${dept.name} — report`}
+                />
+              );
+            })}
           </div>
         ) : (
           <div className="space-y-8">
