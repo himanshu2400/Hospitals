@@ -7,10 +7,9 @@ export type Route =
   | { name: 'settings' }
   | { name: 'queue'; clinicSlug: string; doctorId: string };
 
-function parseHash(): Route {
-  const hash = window.location.hash.replace(/^#/, '') || '/';
-  const parts = hash.split('/').filter(Boolean);
-
+function parsePath(): Route {
+  const path = window.location.pathname.replace(/^\//, '') || '';
+  const parts = path.split('/').filter(Boolean);
   if (parts.length === 0) return { name: 'home' };
   if (parts[0] === 'login') return { name: 'login' };
   if (parts[0] === 'dashboard') return { name: 'dashboard' };
@@ -22,17 +21,19 @@ function parseHash(): Route {
 }
 
 export function useRouter() {
-  const [route, setRoute] = useState<Route>(parseHash);
+  const [route, setRoute] = useState<Route>(parsePath);
 
   useEffect(() => {
-    const onChange = () => setRoute(parseHash());
-    window.addEventListener('hashchange', onChange);
-    return () => window.removeEventListener('hashchange', onChange);
+    const onChange = () => setRoute(parsePath());
+    window.addEventListener('popstate', onChange);
+    return () => window.removeEventListener('popstate', onChange);
   }, []);
 
   const navigate = useCallback((path: string) => {
-    const clean = path.startsWith('#') ? path : `#${path}`;
-    window.location.hash = clean;
+    const clean = path.startsWith('#') ? path.slice(1) : path;
+    const normalized = clean.startsWith('/') ? clean : `/${clean}`;
+    window.history.pushState({}, '', normalized);
+    setRoute(parsePath());
   }, []);
 
   return { route, navigate };
