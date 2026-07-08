@@ -68,7 +68,7 @@ export function AuthPage() {
     try {
       const { error: googleError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/#/dashboard` },
+        options: { redirectTo: `${window.location.origin}/dashboard` },
       });
       if (googleError) throw googleError;
     } catch (err) {
