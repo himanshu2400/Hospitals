@@ -55,7 +55,16 @@ export function CreateClinicForm({ onCreated, onSignOut }: Props) {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-lg">
         <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
-          <div className="brand-gradient px-7 py-8 text-white">
+          <div className="brand-gradient px-7 py-8 text-white relative">
+  {onSignOut && (
+    <button
+      onClick={onSignOut}
+      className="absolute top-4 right-4 flex items-center gap-1.5 text-xs text-white/80 hover:text-white transition"
+    >
+      <LogOut className="w-3.5 h-3.5" />
+      Sign out
+    </button>
+  )}
             <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center mb-4">
               <Building2 className="w-6 h-6" strokeWidth={2.5} />
             </div>
