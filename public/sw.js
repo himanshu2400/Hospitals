@@ -1,50 +1,28 @@
-// QueueFlow service worker — app-shell caching + web push.
-const CACHE = 'queueflow-v2';
-const APP_SHELL = ['/', '/index.html', '/manifest.json'];
+// QueueFlow service worker — push notifications only.
+// Offline caching removed: it was intercepting real-URL navigation
+// (e.g. /login, /dashboard) and breaking routing. Push notifications
+// don't need caching or fetch interception at all, so this version
+// only listens for push/notificationclick and does nothing else.
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()),
-  );
+self.addEventListener('install', () => {
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
-    ).then(() => self.clients.claim()),
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })(),
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  const req = event.request;
-  if (req.method !== 'GET') return;
+// No 'fetch' listener at all. Every request goes straight to the network,
+// exactly as if there were no service worker. This is what makes
+// "Failed to convert value to Response" impossible going forward — we
+// never intercept or respond to navigation requests anymore.
 
-  const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;
-
-  if (req.mode === 'navigate') {
-    event.respondWith(
-      fetch(req).catch(() => caches.match('/index.html').then((r) => r || caches.match('/'))),
-    );
-    return;
-  }
-
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
-        if (res && res.status === 200 && res.type === 'basic') {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(req, copy));
-        }
-        return res;
-      }).catch(() => cached);
-    }),
-  );
-});
-
-// Web push: display the notification payload sent by the edge function.
 self.addEventListener('push', (event) => {
   let payload = { title: 'QueueFlow', body: 'Update on your queue', tag: 'queue' };
   try {
