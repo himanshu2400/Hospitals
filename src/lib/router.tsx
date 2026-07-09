@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 
 export type Route =
   | { name: 'home' }
@@ -20,7 +20,10 @@ function parsePath(): Route {
   return { name: 'home' };
 }
 
-export function useRouter() {
+type RouterContextValue = { route: Route; navigate: (path: string) => void };
+const RouterContext = createContext<RouterContextValue | null>(null);
+
+export function RouterProvider({ children }: { children: ReactNode }) {
   const [route, setRoute] = useState<Route>(parsePath);
 
   useEffect(() => {
@@ -36,5 +39,15 @@ export function useRouter() {
     setRoute(parsePath());
   }, []);
 
-  return { route, navigate };
+  return (
+    <RouterContext.Provider value={{ route, navigate }}>
+      {children}
+    </RouterContext.Provider>
+  );
+}
+
+export function useRouter() {
+  const ctx = useContext(RouterContext);
+  if (!ctx) throw new Error('useRouter must be used within RouterProvider');
+  return ctx;
 }
