@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from 'react';
-import { Activity, Loader2, AlertCircle, Building2 } from 'lucide-react';
+import { Activity, Loader2, AlertCircle, Building2, LogOut } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
-import type { Clinic } from '../lib/types';
-
+import { supabase } from '../lib/supabase';
 const PRESET_COLORS = [
   '#0ea5e9', '#2563eb', '#0d9488', '#059669', '#65a30d',
   '#d97706', '#dc2626', '#db2777', '#475569',
@@ -11,9 +10,9 @@ const PRESET_COLORS = [
 
 type Props = {
   onCreated: (clinic: Clinic) => void;
+  onSignOut?: () => void;
 };
-
-export function CreateClinicForm({ onCreated }: Props) {
+export function CreateClinicForm({ onCreated, onSignOut }: Props) {
   const { reloadProfile } = useAuth();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
