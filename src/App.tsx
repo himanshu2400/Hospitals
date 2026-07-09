@@ -27,9 +27,11 @@ function Routes() {
 
 function App() {
   return (
-    <AuthProvider>
-      <Routes />
-    </AuthProvider>
+    <RouterProvider>
+      <AuthProvider>
+        <Routes />
+      </AuthProvider>
+    </RouterProvider>
   );
 }
 
