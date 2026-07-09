@@ -1,5 +1,5 @@
 import { AuthProvider } from './lib/auth';
-import { useRouter } from './lib/router';
+import { RouterProvider, useRouter } from './lib/router';
 import { HomePage } from './pages/HomePage';
 import { AuthPage } from './pages/AuthPage';
 import { QueuePage } from './pages/QueuePage';
