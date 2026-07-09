@@ -85,7 +85,7 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
     (async () => {
       const { data } = await supabase
         .from('tokens')
-        .select('*')
+        .select('id, queue_session_id, token_number, status, checked_in_at, consult_started_at, consult_ended_at')
         .eq('queue_session_id', sessionId)
         .order('token_number', { ascending: true });
       if (!cancelled) setTokens(data ?? []);
@@ -113,7 +113,7 @@ export function QueuePage({ clinicSlug, doctorId }: Props) {
         async () => {
           const { data } = await supabase
             .from('tokens')
-            .select('*')
+            .select('id, queue_session_id, token_number, status, checked_in_at, consult_started_at, consult_ended_at')
             .eq('queue_session_id', sessionId)
             .order('token_number', { ascending: true });
           if (!cancelled) setTokens(data ?? []);
