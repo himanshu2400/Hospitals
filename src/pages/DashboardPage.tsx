@@ -45,7 +45,7 @@ export function DashboardPage() {
 
   // No clinic and no staff assignments → show the "Create your hospital" form.
   if (!clinic && staffAssignments.length === 0) {
-    return <CreateClinicForm onCreated={() => {}} />;
+    return <CreateClinicForm onCreated={() => {}} onSignOut={handleSignOut} />;
   }
 
   // Staff member (has department_staff assignments but no owned clinic) → department console.
@@ -71,5 +71,5 @@ export function DashboardPage() {
   }
 
   // Fallback (shouldn't happen)
-  return <CreateClinicForm onCreated={() => {}} />;
+  return <CreateClinicForm onCreated={() => {}} onSignOut={handleSignOut} />;
 }
